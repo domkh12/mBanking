@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Setter
 @Getter
@@ -17,24 +18,27 @@ public class Vehicle {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+    @Column(unique = true, nullable = false)
+    private String uuid;
     @Column(unique = true, length = 50)
     private String numberPlate;
-    @Column(nullable = false, length = 100)
-    private LocalDateTime timeIn;
-    @Column(length = 100)
-    private LocalDateTime timeOut;
 
     // optional
     private String color;
     private String vehicleModel;
     private String vehicleDescription;
 
+    private LocalDateTime createdAt;
     private Boolean isDeleted;
 
     // relationship
-    @OneToOne
-    private ParkingSlot parkingSlot;
+    @OneToMany(mappedBy = "vehicle")
+    private List<ParkingSlotDetail> parkingSlotDetail;
 
     @ManyToOne
     private VehicleType vehicleType;
+
+    @ManyToOne
+    private User user;
+
 }

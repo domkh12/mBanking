@@ -29,9 +29,10 @@ public class Parking {
 
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
+    private String createdBy;
     private Boolean isDeleted;
 
     // relationship
-    @OneToMany
+    @OneToMany(mappedBy = "parking")
     private List<ParkingSlot> parkingSlots;
 }

@@ -12,11 +12,12 @@ import java.util.Optional;
 
 @Repository
 public interface ParkingRepository extends JpaRepository<Parking, Integer> {
-//    boolean existsByParkingNameContainsIgnoreCase(String parkingName);
+
     Optional<Parking> findByUuid(String uuid);
 
-    Page<Parking> findByParkingNameContainsIgnoreCaseAndIsDeletedFalse(String parkingName, Pageable pageable);
+    boolean existsByParkingNameContainsIgnoreCase(String parkingName);
 
+    Page<Parking> findByParkingNameContainsIgnoreCaseAndIsDeletedFalse(String parkingName, Pageable pageable);
 
     @Query("select p from Parking p where p.isDeleted = false")
     Page<Parking> findByIsDeletedFalse(Pageable pageable);

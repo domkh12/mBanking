@@ -3,22 +3,25 @@ package edu.npic.sps.features.auth;
 import edu.npic.sps.domain.EmailVerification;
 import edu.npic.sps.domain.Role;
 import edu.npic.sps.domain.User;
-import edu.npic.sps.features.auth.dto.JwtResponse;
-import edu.npic.sps.features.auth.dto.LoginRequest;
-import edu.npic.sps.features.auth.dto.RefreshTokenRequest;
-import edu.npic.sps.features.auth.dto.VerifyRequest;
+import edu.npic.sps.features.auth.dto.*;
 import edu.npic.sps.features.user.UserRepository;
 import edu.npic.sps.features.user.dto.CreateUserRegister;
 import edu.npic.sps.mapper.UserMapper;
 import edu.npic.sps.util.RandomOtp;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,6 +44,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -72,12 +76,44 @@ public class AuthServiceImpl implements AuthService{
     }
 
     @Override
-    public JwtResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
-        log.info("Refresh token request: {}", refreshTokenRequest);
-        Authentication auth = new BearerTokenAuthenticationToken(refreshTokenRequest.token());
-        log.info("log2");
+    public ResponseEntity<Void> logout(HttpServletResponse response) {
+
+        // Clear the refresh token cookie
+        ResponseCookie clearRefreshTokenCookie = ResponseCookie.from("token", "")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .path("/")
+                .maxAge(0)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, clearRefreshTokenCookie.toString());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<JwtResponse> refreshToken(HttpServletRequest request, HttpServletResponse response) {
+
+        String refreshToken = null;
+        System.out.println(Arrays.toString(request.getCookies()));
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+
+                if ("token".equals(cookie.getName())) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (refreshToken == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing");
+        }
+
+        log.info("Refresh token request: {}", refreshToken);
+        Authentication auth = new BearerTokenAuthenticationToken(refreshToken);
         auth = jwtAuthenticationProvider.authenticate(auth);
-        log.info("log3");
         String scope = auth.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
@@ -97,7 +133,7 @@ public class AuthServiceImpl implements AuthService{
                 .issuer("web")
                 .audience(List.of("nextjs", "reactjs"))
                 .subject("Access Token")
-                .expiresAt(now.plus(15, ChronoUnit.MINUTES))
+                .expiresAt(now.plus(15, ChronoUnit.SECONDS))
                 .claim("scope", scope)
                 .build();
 
@@ -105,7 +141,6 @@ public class AuthServiceImpl implements AuthService{
         Jwt encodedJwt = jwtEncoder.encode(jwtEncoderParameters);
 
         String accessToken = encodedJwt.getTokenValue();
-        String refreshToken = refreshTokenRequest.token();
 
         if (Duration.between(Instant.now(), jwt.getExpiresAt()).toDays() < 2) {
             // Create refresh token claims set
@@ -115,18 +150,28 @@ public class AuthServiceImpl implements AuthService{
                     .issuer("web")
                     .audience(List.of("nextjs", "reactjs"))
                     .subject("Refresh Token")
-                    .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                    .expiresAt(now.plus(30, ChronoUnit.SECONDS))
                     .build();
             JwtEncoderParameters jwtEncoderParametersRefreshToken = JwtEncoderParameters.from(jwtClaimsSetRefreshToken);
             Jwt jwtRefreshToken = jwtEncoderRefreshToken.encode(jwtEncoderParametersRefreshToken);
             refreshToken = jwtRefreshToken.getTokenValue();
+
+            // Set new refresh token as an httpOnly cookie
+            ResponseCookie refreshTokenCookie = ResponseCookie.from("token", refreshToken)
+                    .httpOnly(true)
+                    .secure(true) // Use secure flag in production
+                    .sameSite("None")
+                    .path("/")
+                    .maxAge(7 * 24 * 60 * 60) // 7 days
+                    .build();
+
+            response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
         }
 
-        return JwtResponse.builder()
+        return ResponseEntity.ok(JwtResponse.builder()
                 .tokenType(TOKEN_TYPE)
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .build();
+                .build());
     }
 
     @Override
@@ -164,12 +209,16 @@ public class AuthServiceImpl implements AuthService{
     }
 
     @Override
-    public JwtResponse login(LoginRequest loginRequest) {
+    public ResponseEntity<JwtResponse> login(LoginRequest loginRequest, HttpServletResponse response) {
+        System.out.println("email:"+loginRequest.email());
 
         Authentication auth = new UsernamePasswordAuthenticationToken(
                 loginRequest.email(),
                 loginRequest.password()
         );
+
+        User user = userRepository.findByEmail(loginRequest.email())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         auth = daoAuthenticationProvider.authenticate(auth);
 
@@ -194,7 +243,7 @@ public class AuthServiceImpl implements AuthService{
                 .issuer("web")
                 .audience(List.of("nextjs","reactjs"))
                 .subject("Access Token")
-                .expiresAt(now.plus(15, ChronoUnit.MINUTES))
+                .expiresAt(now.plus(15, ChronoUnit.SECONDS))
                 .claim("scope", scope)
                 .build();
 
@@ -205,7 +254,7 @@ public class AuthServiceImpl implements AuthService{
                 .issuer("web")
                 .audience(List.of("nextjs","reactjs"))
                 .subject("Refresh Token")
-                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .expiresAt(now.plus(30, ChronoUnit.SECONDS))
                 .build();
 
         JwtEncoderParameters jwtEncoderParameters = JwtEncoderParameters.from(jwtClaimsSet);
@@ -217,11 +266,21 @@ public class AuthServiceImpl implements AuthService{
         String accessToken = jwt.getTokenValue();
         String refreshToken = jwtRefreshToken.getTokenValue();
 
-        return JwtResponse.builder()
-                .tokenType(TOKEN_TYPE)
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
+        // Set refresh token as an httpOnly cookie
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("token", refreshToken)
+                .httpOnly(true)
+                .secure(true) // Use secure flag in production
+                .sameSite("None")
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60) // 7 days
                 .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
+        return ResponseEntity.ok(JwtResponse.builder()
+                .tokenType("Bearer")
+                .accessToken(accessToken)
+                .build());
     }
 
     @Override

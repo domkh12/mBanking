@@ -28,10 +28,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @EnableMethodSecurity
 @Slf4j
-public class SecurityConfig {
+public class SecurityConfig{
 
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {

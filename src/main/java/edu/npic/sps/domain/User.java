@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Setter
@@ -30,6 +31,7 @@ public class User {
     private String phoneNumber;
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
     // optional
     private String profileImage;
     @Column(nullable = false)
@@ -46,6 +48,10 @@ public class User {
     @JoinTable(joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "role_id", referencedColumnName = "id")
     )
+
     private List<Role> roles;
+
+    @OneToMany(mappedBy = "user")
+    private List<Vehicle> vehicles;
 
 }

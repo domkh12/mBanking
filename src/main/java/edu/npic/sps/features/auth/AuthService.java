@@ -1,17 +1,19 @@
 package edu.npic.sps.features.auth;
 
-import edu.npic.sps.features.auth.dto.JwtResponse;
-import edu.npic.sps.features.auth.dto.LoginRequest;
-import edu.npic.sps.features.auth.dto.RefreshTokenRequest;
-import edu.npic.sps.features.auth.dto.VerifyRequest;
+import edu.npic.sps.features.auth.dto.*;
 import edu.npic.sps.features.user.dto.CreateUserRegister;
 import jakarta.mail.MessagingException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.ResponseEntity;
 
 public interface AuthService {
 
-    JwtResponse refreshToken(RefreshTokenRequest refreshTokenRequest);
+    ResponseEntity<Void> logout(HttpServletResponse response);
 
-    JwtResponse login(LoginRequest loginRequest);
+    ResponseEntity<JwtResponse> refreshToken(HttpServletRequest request, HttpServletResponse response);
+
+    ResponseEntity<JwtResponse> login(LoginRequest loginRequest, HttpServletResponse response);
 
     void register(CreateUserRegister createUserRegister) throws MessagingException;
 

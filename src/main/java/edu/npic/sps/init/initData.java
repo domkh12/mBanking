@@ -2,6 +2,8 @@ package edu.npic.sps.init;
 
 import edu.npic.sps.domain.*;
 import edu.npic.sps.features.parking.ParkingRepository;
+import edu.npic.sps.features.parkingslot.ParkingSlotDetailRepository;
+import edu.npic.sps.features.parkingslot.ParkingSlotRepository;
 import edu.npic.sps.features.user.RoleRepository;
 import edu.npic.sps.features.user.UserRepository;
 import edu.npic.sps.features.vehicle.VehicleRepository;
@@ -26,20 +28,61 @@ public class initData {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final ParkingRepository parkingRepository;
+    private final ParkingSlotRepository parkingSlotRepository;
+    private final ParkingSlotDetailRepository parkingSlotDetailRepository;
 
     @PostConstruct
     public void init() {
         initVehicleTypeData();
-        initVehicleData();
         initRoles();
-        initUser();
+        initUsersData();
         initParking();
+        initVehicleData();
+        initParkingSlotsData();
+        initParkingSlotDetailData();
+
+    }
+
+    private void initParkingSlotDetailData(){
+        ParkingSlotDetail psd = new ParkingSlotDetail();
+        psd.setParkingSlot(parkingSlotRepository.findById(1).get());
+        psd.setVehicle(vehicleRepository.findById(1).get());
+        psd.setTimeIn(LocalDateTime.now());
+        psd.setTimeOut(LocalDateTime.now().plusHours(5));
+
+        ParkingSlotDetail psd2 = new ParkingSlotDetail();
+        psd.setParkingSlot(parkingSlotRepository.findById(2).get());
+        psd.setVehicle(vehicleRepository.findById(2).get());
+        psd.setTimeIn(LocalDateTime.now());
+        psd.setTimeOut(LocalDateTime.now().plusHours(5));
+        parkingSlotDetailRepository.save(psd);
+    }
+
+    private void initParkingSlotsData(){
+        List<ParkingSlot> parkingSlots = new ArrayList<>();
+
+        for (int parkingId = 1; parkingId <= 5; parkingId++) {
+            Parking parking = parkingRepository.findById(parkingId).orElseThrow(() -> new RuntimeException("Parking not found"));
+
+            for (int i = 1; i <= 10; i++) {
+                ParkingSlot ps = new ParkingSlot();
+                ps.setUuid(UUID.randomUUID().toString());
+                ps.setSlotName("P" + parkingId + "-" + String.format("%02d", i));
+                ps.setAlias("p" + parkingId + "-" + String.format("%02d", i));
+                ps.setIsAvailable(true);
+                ps.setIsDeleted(false);
+                ps.setParking(parking);
+                parkingSlots.add(ps);
+            }
+        }
+
+        parkingSlotRepository.saveAll(parkingSlots);
+
     }
 
     private void initParking(){
         int batchSize = 1000;
-        int totalRecords = 100;
-    
+        int totalRecords = 5;
         for (int i = 0; i < totalRecords; i += batchSize) {
             List<Parking> parkingBatch = new ArrayList<>(batchSize);
             for (int j = 0; j < batchSize && (i + j) < totalRecords; j++) {
@@ -59,11 +102,13 @@ public class initData {
         }
     }
 
-    private void initUser(){
+    private void initUsersData(){
+
         User user = new User();
         user.setFullName("NPIC");
         user.setPassword(passwordEncoder.encode("Npic@2024"));
         user.setEmail("npic@gmail.com");
+        user.setPhoneNumber("0877345470");
         user.setUuid(UUID.randomUUID().toString());
         user.setCreatedAt(LocalDateTime.now());
         user.setIsVerified(true);
@@ -120,27 +165,28 @@ public class initData {
     }
 
     private void initVehicleData(){
-
         VehicleType vehicleType = vehicleTypeRepository.findById(1).orElseThrow();
         Vehicle v1 = new Vehicle();
         v1.setId(1);
-        v1.setTimeIn(LocalDateTime.now());
-        v1.setTimeOut(LocalDateTime.now().plusHours(5));
+        v1.setUuid(UUID.randomUUID().toString());
         v1.setVehicleModel("Lexus");
         v1.setNumberPlate("1AF-0022");
         v1.setVehicleType(vehicleType);
         v1.setIsDeleted(false);
+        v1.setCreatedAt(LocalDateTime.now());
         v1.setVehicleDescription("This is car 1");
+        v1.setUser(userRepository.findById(1).get());
 
         Vehicle v2 = new Vehicle();
         v2.setId(2);
-        v2.setTimeIn(LocalDateTime.now().plusHours(2));
-        v2.setTimeOut(LocalDateTime.now().plusHours(5));
+        v2.setUuid(UUID.randomUUID().toString());
         v2.setVehicleModel("Camry");
         v2.setNumberPlate("1AF-0322");
         v2.setVehicleType(vehicleType);
         v2.setIsDeleted(false);
         v2.setVehicleDescription("This is car 2");
+        v2.setCreatedAt(LocalDateTime.now());
+        v2.setUser(userRepository.findById(1).get());
 
         vehicleRepository.saveAll(List.of(v1, v2));
 

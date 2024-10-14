@@ -24,6 +24,9 @@ repositories {
 }
 
 dependencies {
+
+    implementation 'org.springframework.security:spring-security-messaging:6.3.2'
+
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
